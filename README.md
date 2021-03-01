@@ -7,6 +7,7 @@
 - [npm readline: 在terminal讓使用者輸入資料](https://segmentfault.com/q/1010000022283003)
 - [npm urlencode: 將編碼轉成utf-8或解碼](https://www.npmjs.com/package/urlencode)
 - [存成csv檔](https://www.npmjs.com/package/objects-to-csv)
+- [npm fs: 教學](array.join console.log印出object object)
 
 ## regEx心得
 
