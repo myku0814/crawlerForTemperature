@@ -7,7 +7,7 @@
 - [npm readline: 在terminal讓使用者輸入資料](https://segmentfault.com/q/1010000022283003)
 - [npm urlencode: 將編碼轉成utf-8或解碼](https://www.npmjs.com/package/urlencode)
 - [存成csv檔](https://www.npmjs.com/package/objects-to-csv)
-- [npm fs: 教學](array.join console.log印出object object)
+- [node fs: 教學](https://nodejs.org/api/fs.html)
 
 ## regEx心得
 
@@ -19,3 +19,4 @@
 - `^`表開頭，`$`表結尾。
 - `|`表或。
 - `/[^a-zA-Z0-9%]/`的`[]`表集合，在集合中`^`表否定。這裡意思是匹配非字母大小寫或數字的東西。
+- `/a[^]*b/`表a跟b之間能有隨意的字。
