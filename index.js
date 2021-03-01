@@ -32,10 +32,13 @@ const files = [
 /****************************************************************/
 // import module
 const request   = require('request'),   cheerio      = require('cheerio'),
-      urlencode = require('urlencode'), ObjectsToCsv = require('objects-to-csv');
+      urlencode = require('urlencode'), ObjectsToCsv = require('objects-to-csv'),
+      fs        = require('fs');
 // generate days
 const dateGen = (fromMonth, toMonth, year) => {
     const dates = [];
+    const valid = a => (!Number.isInteger(a) || a>12 || a<1) ? false : true;
+    if(!valid(fromMonth) || !valid(toMonth) || !Number.isInteger(year)) { console.log('**********\ndays err...\n**********'); return; }
     [ fromMonth, toMonth ] = (fromMonth > toMonth)? [ toMonth, fromMonth ] : [ fromMonth, toMonth ];
     for(let mm=fromMonth; mm<=toMonth; mm++) {
         let days = null;
@@ -89,7 +92,7 @@ const urlsGen = function(stats) {
     return urls;
 }
 // urls crawler
-const craw = function(urls) {
+const craw = function(urls, callback, num) {
     const result = [], promises = [];
     urls.forEach((url) => { // async
         promises.push(new Promise((resolve, _) => {
@@ -119,19 +122,41 @@ const craw = function(urls) {
     Promise.all(promises).then(async () => { 
             result.sort((a, b) => Number(a.date.replace(/\//g, '')) - Number(b.date.replace(/\//g, '')));
             const csv = new ObjectsToCsv(result);
-            await csv.toDisk(`./${result[0].staname}.csv`);
-            console.log(`${result[0].staname}finish`);
-            magic = result;
+            await csv.toDisk(`./${result[0].staname}${num}.csv`);
+            callback();
     });
     return result;
 }
 // temperature crawler
-const tp = function(file, tRange) {
+const tp = function(file, tRange, callback, num='') {
     const { m1, m2, y } = tRange;
     const dates = dateGen(m1, m2, y);
     const stats = statsGen(file, dates);
     const urls = urlsGen(stats);
-    craw(urls);
+    craw(urls, callback, num);
+};
+// add station
+const add = (files, station, stname) => {
+    files.push(Object.assign({}, {
+        station: station.replace(/^\s+|\s+$/g, '').replace(/[^a-zA-Z0-9]/g,''),
+        stname: stname.replace(/^\s+|\s+$/g, '')
+    }));
+    let lastFourStations = '';
+    files.slice(-4).forEach((file, i) => {
+        if(i%2 == 0 && i!= 0) { lastFourStations += '\n'; }
+        lastFourStations += `${JSON.stringify(file)}, `;
+    }); 
+    return lastFourStations;
+}
+// del station
+const del = (files, fileName) => {
+    let removed = '';
+    files.forEach((file, idx) => {
+        if(file.stname.toString() == fileName.replace(/^\s+|\s+$/g, '').toString()) { 
+            removed += JSON.stringify(files.splice(idx, 1)); 
+        }
+    });
+    return removed;
 };
 // commandLine settings
 (async () => {
@@ -144,12 +169,19 @@ const tp = function(file, tRange) {
     const rlPromisify = fn => async (...args) => new Promise(resolve => fn(...args, resolve));
     const question = rlPromisify(rl.question.bind(rl));
     // custom settings
-    const check = (str) => Number(str.replace(/^\s+|\s+$/g, '').replace(/^0+/, ''));
-    const QGen = (str) => `${str}: \nconsole> `;
-    const optionGen = (files) => {
+    const check = (str) => {
+        const tmp = Number(str.replace(/^\s+|\s+$/g, '').replace(/^0+/, ''));
+        return (tmp === 520)? 'esc' : tmp;
+    }
+    const QGen = (str, more='') => (str === '')  ? `console> `         : 
+                                   (more === '')? `${str}: \nconsole> ` : `${str}: \n${more}\nconsole> `;
+    const optionGen = (files, ...otherfunc) => {
         let q = '';
+        if(otherfunc.length !== 0) {
+            otherfunc.forEach((func, idx) => q+= `-${Number(idx)+1}: ${func.name.toString().toUpperCase()} 功能   `);
+        }
         files.forEach((file, i) => {
-            if(i%5==0 && i!=0) { q+= '\n'; }
+            if(i%5==0) { q+= '\n'; }
             const num = (String(i).length == 1)? '0'+i : i;
             q += `${num}: ${file.stname}`;
             if(file.stname.length == 2) { q+= `       `; }
@@ -158,14 +190,63 @@ const tp = function(file, tRange) {
             else if(file.stname.length == 5) { q+= ` `; }
             else q+= ` `;
         });
-        return q;
+        q += '\n(輸入520結束程式或直接關掉)';
+        q += '\n======================================================================';
+        return { q: q, funcs: otherfunc };
     };
-    const y = await question(QGen('請輸入年份'));
-    const m1 = await question(QGen('請輸入月份(起)'));
-    const m2 = await question(QGen('請選擇月份(終)'));
-    const option = await question(`請選擇要爬蟲的測站: \n${optionGen(files)}\nconsole> `);
-    tRange = { m1: check(m1), m2: check(m2), y: check(y) };
-    tp(files[check(option)], tRange);
-    setTimeout(()=>{}, 5000); // 存粹為了看清楚terminal有沒有error，等5秒
+    while(true) {
+        const { q, funcs } = optionGen(files, add, del);
+        console.log('======================================================================');
+        const option = await question(QGen('請選擇要爬蟲的測站', q));
+        if(check(option) === 'esc') {
+            console.log('結束程式中...');
+            setTimeout( _ => {}, 500);
+            break;
+        } else if(check(option) === -1) {
+            console.log('請輸入要加入的測站資訊');
+            const station = await question(QGen('station(ex C0F9T0)'));
+            const stname = await question(QGen('stname(ex 西屯)'));
+            console.log(`最後4個選項為:\n${funcs[0](files, station, stname)}`);
+        } else if(check(option) === -2) {
+            const fileName = await question(QGen('請輸入要刪除的站名(ex 西屯)'));
+            console.log(`刪除了 ${funcs[1](files, fileName)} 測站`);
+        } else {
+            const y = await question(QGen('請輸入年份'));
+            const m1 = await question(QGen('請輸入月份(起)'));
+            const m2 = await question(QGen('請選擇月份(終)'));
+            tRange = { m1: check(m1), m2: check(m2), y: check(y) };
+            if(Math.abs(tRange.m2 - tRange.m1)>6) {
+                tp(files[check(option)], Object.assign({}, 
+                    { m1: tRange.m1, m2: tRange.m1 + 5, y: tRange.y }
+                ), () => {
+                    tp(files[check(option)], Object.assign({}, 
+                        { m1: tRange.m1+6, m2: tRange.m2, y: tRange.y }
+                    ), () => {
+                        let tmp = '';
+                        fs.readFile(`${files[check(option)].stname}1.csv`, (err, data) => {
+                            err ? console.log(err) : tmp += data.toString();
+                            fs.readFile(`${files[check(option)].stname}2.csv`, (err, data) => {
+                                err ? console.log(err) : tmp += data.toString();
+                                fs.writeFile(`${files[check(option)].stname}.csv`, tmp, (err) => {
+                                    if(err) { console.log(err); }
+                                    console.log(`${files[check(option)].stname}finish`);
+                                    console.log(QGen(''))
+                                    try {
+                                        fs.unlinkSync(`${files[check(option)].stname}1.csv`);
+                                        fs.unlinkSync(`${files[check(option)].stname}2.csv`);
+                                    } catch(err) { console.error(err); }
+                                });
+                            });
+                        });
+                    }, '2');
+                }, '1');
+            } else {
+                tp(files[check(option)], tRange, () => {
+                    console.log(`${files[check(option)].stname}finish`);
+                    console.log(QGen(''))
+                });
+            }
+        }
+    }
     rl.close();
 })();
