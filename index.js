@@ -145,7 +145,6 @@ const QGen = (txt) => {
             let yy = await question('<請輸入year>'.creatConsole());
             let mm1 = await question('<請輸入月份(起)>'.creatConsole());
             let mm2 = await question('<請輸入月份(終)>'.creatConsole());
-            console.log(choose.eliminateSpace().eliminate0());
             resolve({
                 choose: choose.eliminateSpace().eliminate0(),
                 yy: yy.eliminateSpace().eliminate0(),
