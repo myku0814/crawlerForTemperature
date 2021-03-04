@@ -18,7 +18,7 @@ String.prototype.eliminateSpace = function() {
     return this.replace(/^\s+|\s+$/g, '');
 };
 String.prototype.eliminate0 = function() {
-    return this.replace(/^0+(?=[1-9]+)/,'');
+    return this.replace(/^0(?=[0-9])/,'');
 };
 String.prototype.creatConsole = function() {
     return `${this}\nconsole> `;
@@ -145,6 +145,7 @@ const QGen = (txt) => {
             let yy = await question('<請輸入year>'.creatConsole());
             let mm1 = await question('<請輸入月份(起)>'.creatConsole());
             let mm2 = await question('<請輸入月份(終)>'.creatConsole());
+            console.log(choose.eliminateSpace().eliminate0());
             resolve({
                 choose: choose.eliminateSpace().eliminate0(),
                 yy: yy.eliminateSpace().eliminate0(),
